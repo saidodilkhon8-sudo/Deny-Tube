@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>DenyTube</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+header {
+  background: #202020;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#search {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+}
+#content {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+#sidebar {
+  width: 250px;
+  background: #181818;
+  overflow-y: auto;
+  padding: 10px;
+}
+#videos {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+}
+.video {
+  background: #1f1f1f;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.video:hover {
+  transform: scale(1.03);
+}
+.video img {
+  width: 100%;
+  display: block;
+}
+.video-title {
+  padding: 10px;
+  font-size: 14px;
+}
+#player {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,.9);
+  align-items: center;
+  justify-content: center;
+}
+#player iframe {
+  width: 80%;
+  height: 80%;
+  border: none;
+}
+#closePlayer {
+  position: absolute;
+  top: 20px;
+  right: 40px;
+  font-size: 35px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h2>DenyTube</h2>
+  <input id="search" type="text" placeholder="Поиск видео...">
+</header>
+
+<div id="content">
+  <div id="sidebar">
+    <h3>Меню</h3>
+    <p>🔹 Главная</p>
+    <p>🔹 Тренды</p>
+    <p>🔹 Подписки</p>
+    <p>🔹 История</p>
+  </div>
+
+  <div id="videos"></div>
+</div>
+
+<div id="player">
+  <div id="closePlayer">✖</div>
+  <iframe id="frame" allowfullscreen></iframe>
+</div>
+
+<script>
+// ========== НАСТРОЙКИ ==========
+const API_KEY = "PASTE_YOUR_API_KEY_HERE"; // <-- ВСТАВЬ СВОЙ API КЛЮЧ
+const API_URL = "https://www.googleapis.com/youtube/v3/search";
+
+// ========== ЗАГРУЗКА СЛУЧАЙНЫХ ВИДЕО ==========
+async function loadRandomVideos() {
+  const query = ["news", "gameplay", "music", "minecraft", "tech", "funny"][Math.floor(Math.random()*6)];
+
+  const url = `${API_URL}?key=${API_KEY}&type=video&part=snippet&maxResults=25&q=${query}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  showVideos(data.items);
+}
+
+// ========== ПОИСК ==========
+document.getElementById("search").addEventListener("keyup", async (e) => {
+  if (e.key !== "Enter") return;
+
+  const q = e.target.value;
+  const url = `${API_URL}?key=${API_KEY}&type=video&part=snippet&maxResults=25&q=${q}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+  showVideos(data.items);
+});
+
+// ========== ПОКАЗ ВИДЕО ==========
+function showVideos(items) {
+  const container = document.getElementById("videos");
+  container.innerHTML = "";
+
+  items.forEach(v => {
+    const id = v.id.videoId;
+    const thumb = v.snippet.thumbnails.high.url;
+    const title = v.snippet.title;
+
+    const div = document.createElement("div");
+    div.className = "video";
+    div.innerHTML = `
+      <img src="${thumb}">
+      <div class="video-title">${title}</div>
+    `;
+    div.onclick = () => openVideo(id);
+
+    container.appendChild(div);
+  });
+}
+
+// ========== ОТКРЫТИЕ ВИДЕО ==========
+function openVideo(id) {
+  document.getElementById("player").style.display = "flex";
+  document.getElementById("frame").src = `https://www.youtube.com/embed/${id}`;
+}
+
+document.getElementById("closePlayer").onclick = () => {
+  document.getElementById("player").style.display = "none";
+  document.getElementById("frame").src = "";
+};
+
+// ========== СТАРТ ==========
+loadRandomVideos();
+
+</script>
+</body>
+</html>
