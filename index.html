@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>DenyTube 3.0</title>
+<title>DenyTube 4.0</title>
 <style>
 body { margin:0; font-family:Arial; background:#111; color:white; }
 header { background:#202020; padding:10px 15px; display:flex; align-items:center; gap:10px; }
@@ -30,31 +30,26 @@ header { background:#202020; padding:10px 15px; display:flex; align-items:center
 <body>
 
 <header>
-  <h2>DenyTube 3.0</h2>
-  <input id="search" type="text" placeholder="Поиск (например Minecraft)">
+  <h2>DenyTube 4.0</h2>
+  <input id="search" type="text" placeholder="Поиск видео...">
 </header>
 
 <div id="content">
-
   <div id="sidebar">
     <div id="authPanel"></div>
     <h3>Меню</h3>
     <p>🔥 Главная</p>
-    <p>📈 Тренды</p>
     <p>⭐ Рекомендации</p>
     <p>👤 Профиль</p>
     <h3>Подписки</h3>
     <div id="subscriptions"></div>
   </div>
-
   <div id="videos"></div>
-
 </div>
 
 <div id="player">
   <div id="closePlayer">✖</div>
   <iframe id="frame" allowfullscreen></iframe>
-
   <div class="comment-box">
     <h3>Комментарии</h3>
     <textarea id="commentInput" style="width:100%; height:60px;"></textarea>
@@ -69,201 +64,150 @@ header { background:#202020; padding:10px 15px; display:flex; align-items:center
 </div>
 
 <script>
-// ===== LOCAL USERS =====
+// ===== AUTONOMOUS DATA =====
+const videosData = [
+  {id:"dQw4w9WgXcQ", title:"Rick Astley - Never Gonna Give You Up", author:"RickAstley"},
+  {id:"9bZkp7q19f0", title:"PSY - GANGNAM STYLE", author:"officialpsy"},
+  {id:"fRh_vgS2dFE", title:"Justin Bieber - Sorry", author:"JustinBieberVEVO"},
+  {id:"3JZ_D3ELwOQ", title:"Ed Sheeran - Shape of You", author:"EdSheeran"},
+  {id:"JGwWNGJdvx8", title:"Ed Sheeran - Perfect", author:"EdSheeran"},
+  {id:"RgKAFK5djSk", title:"Wiz Khalifa - See You Again", author:"WizKhalifaVEVO"},
+  {id:"kJQP7kiw5Fk", title:"Luis Fonsi - Despacito", author:"LuisFonsiVEVO"},
+  {id:"OPf0YbXqDm0", title:"Mark Ronson - Uptown Funk", author:"MarkRonsonVEVO"},
+  {id:"2Vv-BfVoq4g", title:"Ed Sheeran - Thinking Out Loud", author:"EdSheeran"},
+  {id:"60ItHLz5WEA", title:"Alan Walker - Faded", author:"AlanWalker"},
+];
+
+// ===== AUTH =====
 let currentUser = localStorage.getItem("denytube_user");
 let currentAvatar = localStorage.getItem("denytube_avatar") || "https://i.pravatar.cc/50";
 let currentVideo = null;
 
-// ===== AUTH PANEL =====
-function renderAuth() {
-  const box = document.getElementById("authPanel");
-  if (!currentUser) {
-    box.innerHTML = `
-      <h3>Авторизация</h3>
-      <input id="loginName" placeholder="Имя" style="width:100%; padding:5px;"><br>
-      <input type="file" id="avatarInput" style="width:100%; margin-top:5px;"><br>
-      <button onclick="login()" style="width:100%; margin-top:5px;">Войти</button>
-    `;
-  } else {
-    box.innerHTML = `<h3>Привет, ${currentUser}</h3>
+function renderAuth(){
+  const box=document.getElementById("authPanel");
+  if(!currentUser){
+    box.innerHTML=`<h3>Авторизация</h3>
+    <input id="loginName" placeholder="Имя" style="width:100%; padding:5px;"><br>
+    <input type="file" id="avatarInput" style="width:100%; margin-top:5px;"><br>
+    <button onclick="login()" style="width:100%; margin-top:5px;">Войти</button>`;
+  }else{
+    box.innerHTML=`<h3>Привет, ${currentUser}</h3>
       <img src="${currentAvatar}" style="width:50px;height:50px;border-radius:50%;"><br>
       <button onclick="logout()" style="width:100%;">Выйти</button>`;
   }
 }
-
-function login() {
-  const name = document.getElementById("loginName").value.trim();
-  if (!name) return;
-  const avatarInput = document.getElementById("avatarInput");
-  if (avatarInput.files && avatarInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      currentAvatar = e.target.result;
-      localStorage.setItem("denytube_avatar", currentAvatar);
-    }
+function login(){
+  const name=document.getElementById("loginName").value.trim();
+  if(!name) return;
+  const avatarInput=document.getElementById("avatarInput");
+  if(avatarInput.files && avatarInput.files[0]){
+    const reader=new FileReader();
+    reader.onload=function(e){currentAvatar=e.target.result;localStorage.setItem("denytube_avatar",currentAvatar);}
     reader.readAsDataURL(avatarInput.files[0]);
   }
-  currentUser = name;
-  localStorage.setItem("denytube_user", name);
+  currentUser=name;
+  localStorage.setItem("denytube_user",name);
   renderAuth();
 }
-function logout() {
-  currentUser = null;
-  localStorage.removeItem("denytube_user");
-  renderAuth();
-}
-
+function logout(){currentUser=null;localStorage.removeItem("denytube_user");renderAuth();}
 renderAuth();
 
-// ===== YT RSS to JSON =====
-async function getYoutubeRSS(keyword) {
-  const rss = `https://www.youtube.com/feeds/videos.xml?search_query=${encodeURIComponent(keyword)}`;
-  const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rss)}`;
-  const r = await fetch(url);
-  return await r.json();
-}
-
-// ===== MAIN LOAD =====
-async function loadVideos(keyword = "trending") {
-  const feed = await getYoutubeRSS(keyword);
-  const items = feed.items || [];
-  showVideos(items);
-}
-
-function showVideos(items) {
-  const container = document.getElementById("videos");
-  container.innerHTML = "";
-
-  items.forEach(v => {
-    const div = document.createElement("div");
-    div.className = "video";
-    div.innerHTML = `
-      <img src="${v.thumbnail}">
-      <div class="video-title">${v.title}</div>
-    `;
-    div.onclick = () => openVideo(v.videoId, v.title, v.author);
+// ===== SHOW VIDEOS =====
+function showVideos(items){
+  const container=document.getElementById("videos"); container.innerHTML="";
+  items.forEach(v=>{
+    const div=document.createElement("div"); div.className="video";
+    div.innerHTML=`<img src="https://img.youtube.com/vi/${v.id}/hqdefault.jpg"><div class="video-title">${v.title}</div>`;
+    div.onclick=()=>openVideo(v.id,v.title,v.author);
     container.appendChild(div);
   });
 }
+showVideos(videosData);
 
-// ===== VIDEO OPEN =====
-function openVideo(id, title, author) {
-  currentVideo = id;
-  document.getElementById("player").style.display = "flex";
-  document.getElementById("frame").src = `https://www.youtube.com/embed/${id}`;
-
-  loadComments();
-  loadLikes();
-  loadSubscription(author);
-  addToHistory(id);
+// ===== VIDEO PLAYER =====
+function openVideo(id,title,author){
+  currentVideo=id;
+  document.getElementById("player").style.display="flex";
+  document.getElementById("frame").src=`https://www.youtube.com/embed/${id}`;
+  loadComments(); loadLikes(); loadSubscription(author); addToHistory(id);
 }
-
-document.getElementById("closePlayer").onclick = () => {
-  document.getElementById("player").style.display = "none";
-  document.getElementById("frame").src = "";
+document.getElementById("closePlayer").onclick=()=>{
+  document.getElementById("player").style.display="none";
+  document.getElementById("frame").src="";
 };
 
 // ===== COMMENTS =====
-function loadComments() {
-  const list = document.getElementById("commentsList");
-  const cm = JSON.parse(localStorage.getItem("comments_" + currentVideo) || "[]");
-  list.innerHTML = "";
-  cm.forEach(c => {
-    list.innerHTML += `<div class="comment"><img src="${c.avatar}" style="width:25px;height:25px;border-radius:50%;vertical-align:middle;margin-right:5px;"><b>${c.user}:</b> ${c.text}</div>`;
-  });
+function loadComments(){
+  const list=document.getElementById("commentsList");
+  const cm=JSON.parse(localStorage.getItem("comments_"+currentVideo)||"[]");
+  list.innerHTML="";
+  cm.forEach(c=>{list.innerHTML+=`<div class="comment"><img src="${c.avatar}" style="width:25px;height:25px;border-radius:50%;vertical-align:middle;margin-right:5px;"><b>${c.user}:</b> ${c.text}</div>`;});
 }
-
-document.getElementById("sendComment").onclick = () => {
-  if (!currentUser) return alert("Авторизуйся!");
-  const text = document.getElementById("commentInput").value.trim();
-  if (!text) return;
-  const cm = JSON.parse(localStorage.getItem("comments_" + currentVideo) || "[]");
-  cm.push({ user: currentUser, avatar: currentAvatar, text });
-  localStorage.setItem("comments_" + currentVideo, JSON.stringify(cm));
-  document.getElementById("commentInput").value = "";
-  loadComments();
+document.getElementById("sendComment").onclick=()=>{
+  if(!currentUser) return alert("Авторизуйся!");
+  const text=document.getElementById("commentInput").value.trim(); if(!text) return;
+  const cm=JSON.parse(localStorage.getItem("comments_"+currentVideo)||"[]");
+  cm.push({user:currentUser,avatar:currentAvatar,text}); localStorage.setItem("comments_"+currentVideo,JSON.stringify(cm));
+  document.getElementById("commentInput").value=""; loadComments();
 };
 
 // ===== LIKES/DISLIKES =====
-function loadLikes() {
-  let l = parseInt(localStorage.getItem("like_" + currentVideo) || "0");
-  let d = parseInt(localStorage.getItem("dislike_" + currentVideo) || "0");
-  document.getElementById("likeCount").innerText = l;
-  document.getElementById("dislikeCount").innerText = d;
-
-  document.getElementById("likeBtn").classList.remove("liked");
-  document.getElementById("dislikeBtn").classList.remove("disliked");
-  const userLiked = JSON.parse(localStorage.getItem("user_likes") || "{}");
-  if (userLiked[currentVideo] === "like") document.getElementById("likeBtn").classList.add("liked");
-  if (userLiked[currentVideo] === "dislike") document.getElementById("dislikeBtn").classList.add("disliked");
+function loadLikes(){
+  let l=parseInt(localStorage.getItem("like_"+currentVideo)||"0");
+  let d=parseInt(localStorage.getItem("dislike_"+currentVideo)||"0");
+  document.getElementById("likeCount").innerText=l; document.getElementById("dislikeCount").innerText=d;
+  const userLiked=JSON.parse(localStorage.getItem("user_likes")||"{}");
+  document.getElementById("likeBtn").classList.remove("liked"); document.getElementById("dislikeBtn").classList.remove("disliked");
+  if(userLiked[currentVideo]==="like") document.getElementById("likeBtn").classList.add("liked");
+  if(userLiked[currentVideo]==="dislike") document.getElementById("dislikeBtn").classList.add("disliked");
 }
-
-document.getElementById("likeBtn").onclick = () => {
-  if (!currentUser) return alert("Авторизуйся!");
-  let l = parseInt(localStorage.getItem("like_" + currentVideo) || "0");
-  let d = parseInt(localStorage.getItem("dislike_" + currentVideo) || "0");
-  const userLiked = JSON.parse(localStorage.getItem("user_likes") || "{}");
-
-  if (userLiked[currentVideo] === "like") return;
-  if (userLiked[currentVideo] === "dislike") { d--; document.getElementById("dislikeBtn").classList.remove("disliked"); }
-  l++; userLiked[currentVideo] = "like";
-  localStorage.setItem("like_" + currentVideo, l);
-  localStorage.setItem("dislike_" + currentVideo, d);
-  localStorage.setItem("user_likes", JSON.stringify(userLiked));
-  loadLikes();
+document.getElementById("likeBtn").onclick=()=>{
+  if(!currentUser) return alert("Авторизуйся!");
+  let l=parseInt(localStorage.getItem("like_"+currentVideo)||"0");
+  let d=parseInt(localStorage.getItem("dislike_"+currentVideo)||"0");
+  const userLiked=JSON.parse(localStorage.getItem("user_likes")||"{}");
+  if(userLiked[currentVideo]==="like") return;
+  if(userLiked[currentVideo]==="dislike"){ d--; document.getElementById("dislikeBtn").classList.remove("disliked"); }
+  l++; userLiked[currentVideo]="like"; localStorage.setItem("like_"+currentVideo,l);
+  localStorage.setItem("dislike_"+currentVideo,d); localStorage.setItem("user_likes",JSON.stringify(userLiked)); loadLikes();
 };
-document.getElementById("dislikeBtn").onclick = () => {
-  if (!currentUser) return alert("Авторизуйся!");
-  let l = parseInt(localStorage.getItem("like_" + currentVideo) || "0");
-  let d = parseInt(localStorage.getItem("dislike_" + currentVideo) || "0");
-  const userLiked = JSON.parse(localStorage.getItem("user_likes") || "{}");
-
-  if (userLiked[currentVideo] === "dislike") return;
-  if (userLiked[currentVideo] === "like") { l--; document.getElementById("likeBtn").classList.remove("liked"); }
-  d++; userLiked[currentVideo] = "dislike";
-  userLiked[currentVideo] = "dislike";
-  localStorage.setItem("like_" + currentVideo, l);
-  localStorage.setItem("dislike_" + currentVideo, d);
-  localStorage.setItem("user_likes", JSON.stringify(userLiked));
-  loadLikes();
+document.getElementById("dislikeBtn").onclick=()=>{
+  if(!currentUser) return alert("Авторизуйся!");
+  let l=parseInt(localStorage.getItem("like_"+currentVideo)||"0");
+  let d=parseInt(localStorage.getItem("dislike_"+currentVideo)||"0");
+  const userLiked=JSON.parse(localStorage.getItem("user_likes")||"{}");
+  if(userLiked[currentVideo]==="dislike") return;
+  if(userLiked[currentVideo]==="like"){ l--; document.getElementById("likeBtn").classList.remove("liked"); }
+  d++; userLiked[currentVideo]="dislike"; localStorage.setItem("like_"+currentVideo,l);
+  localStorage.setItem("dislike_"+currentVideo,d); userLiked[currentVideo]="dislike"; localStorage.setItem("user_likes",JSON.stringify(userLiked)); loadLikes();
 };
 
 // ===== SUBSCRIPTIONS =====
-function loadSubscription(author) {
-  const subs = JSON.parse(localStorage.getItem("subscriptions") || "[]");
-  const btn = document.getElementById("subBtn");
-  btn.innerText = subs.includes(author) ? "✅ Подписан" : "🔔 Подписаться";
-  btn.classList.toggle("subscribed", subs.includes(author));
-  btn.onclick = () => {
-    if (!currentUser) return alert("Авторизуйся!");
-    let s = JSON.parse(localStorage.getItem("subscriptions") || "[]");
-    if (s.includes(author)) { s = s.filter(a => a!==author); } else { s.push(author); }
-    localStorage.setItem("subscriptions", JSON.stringify(s));
-    loadSubscription(author);
-    renderSubscriptions();
+function loadSubscription(author){
+  const subs=JSON.parse(localStorage.getItem("subscriptions")||"[]");
+  const btn=document.getElementById("subBtn");
+  btn.innerText=subs.includes(author)?"✅ Подписан":"🔔 Подписаться";
+  btn.classList.toggle("subscribed",subs.includes(author));
+  btn.onclick=()=>{
+    if(!currentUser) return alert("Авторизуйся!");
+    let s=JSON.parse(localStorage.getItem("subscriptions")||"[]");
+    if(s.includes(author)){ s=s.filter(a=>a!==author);} else { s.push(author);}
+    localStorage.setItem("subscriptions",JSON.stringify(s));
+    loadSubscription(author); renderSubscriptions();
   }
 }
-function renderSubscriptions() {
-  const list = document.getElementById("subscriptions");
-  const s = JSON.parse(localStorage.getItem("subscriptions") || "[]");
-  list.innerHTML = s.map(a => `<p>${a}</p>`).join("");
+function renderSubscriptions(){
+  const list=document.getElementById("subscriptions");
+  const s=JSON.parse(localStorage.getItem("subscriptions")||"[]");
+  list.innerHTML=s.map(a=>`<p>${a}</p>`).join("");
 }
 renderSubscriptions();
 
 // ===== HISTORY =====
-function addToHistory(id) {
-  let h = JSON.parse(localStorage.getItem("history") || "[]");
-  if (!h.includes(id)) h.push(id);
-  localStorage.setItem("history", JSON.stringify(h));
-}
+function addToHistory(id){ let h=JSON.parse(localStorage.getItem("history")||"[]"); if(!h.includes(id)) h.push(id); localStorage.setItem("history",JSON.stringify(h)); }
 
 // ===== SEARCH =====
-document.getElementById("search").addEventListener("keyup", e => {
-  if (e.key === "Enter") loadVideos(e.target.value);
-});
-
-// ===== START =====
-loadVideos("trending");
+document.getElementById("search").addEventListener("keyup",e=>{ if(e.key==="Enter"){ const q=e.target.value.toLowerCase(); const filtered=videosData.filter(v=>v.title.toLowerCase().includes(q)); showVideos(filtered); } });
 
 </script>
 </body>
