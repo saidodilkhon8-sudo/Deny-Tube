@@ -1,176 +1,605 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>DenyTube</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DenyTube — локальная версия</title>
 <style>
-body {
-  margin: 0;
-  background: #111;
-  color: white;
-  font-family: Arial, sans-serif;
-}
-header {
-  background: #202020;
-  padding: 10px 15px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-#search {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-}
-#content {
-  display: flex;
-  height: calc(100vh - 60px);
-}
-#sidebar {
-  width: 250px;
-  background: #181818;
-  overflow-y: auto;
-  padding: 10px;
-}
-#videos {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 15px;
-}
-.video {
-  background: #1f1f1f;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: 0.15s;
-}
-.video:hover {
-  transform: scale(1.03);
-}
-.video img {
-  width: 100%;
-  display: block;
-}
-.video-title {
-  padding: 10px;
-  font-size: 14px;
-}
-#player {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,.9);
-  align-items: center;
-  justify-content: center;
-}
-#player iframe {
-  width: 80%;
-  height: 80%;
-  border: none;
-}
-#closePlayer {
-  position: absolute;
-  top: 20px;
-  right: 40px;
-  font-size: 35px;
-  cursor: pointer;
-}
+  :root{
+    --bg:#0b0f12; --card:#0f1720; --accent:#ff3b30; --muted:#9aa7b2; --white:#e6eef3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#07121a 0%, #041018 100%);color:var(--white);min-height:100vh}
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));position:sticky;top:0;z-index:90}
+  .logo{font-weight:900;color:var(--accent);font-size:20px}
+  .search{flex:1;display:flex;gap:8px}
+  input[type="text"]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--white)}
+  button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;color:var(--white);cursor:pointer}
+  button.primary{background:var(--accent);border-color:transparent;color:#071018}
+  main{display:grid;grid-template-columns: 1fr 320px;gap:16px;padding:18px}
+  .player{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,10,0.6)}
+  .video-wrap{position:relative;padding-top:56.25%;border-radius:8px;overflow:hidden;background:#000}
+  iframe{position:absolute;inset:0;border:0;width:100%;height:100%}
+  .meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  .title{font-size:18px;font-weight:700}
+  .channel{color:var(--muted);cursor:pointer}
+  .actions{display:flex;gap:8px;align-items:center}
+  .sidebar{display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,10,0.45)}
+  .list{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;padding-right:6px}
+  .list-item{display:flex;gap:8px;align-items:center;cursor:pointer;padding:6px;border-radius:8px}
+  .thumb{width:120px;height:68px;object-fit:cover;border-radius:6px;background:#111}
+  .vtitle{font-size:13px;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .comments{margin-top:12px}
+  .comment{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px}
+  .profile{display:flex;gap:10px;align-items:center}
+  .avatar{width:48px;height:48px;border-radius:999px;background:linear-gradient(135deg,#334,#556);display:flex;align-items:center;justify-content:center;font-weight:800}
+  .small{font-size:13px;color:var(--muted)}
+  .stub{color:var(--muted);padding:14px;border-radius:8px;background:rgba(255,255,255,0.01)}
+  footer{padding:10px 18px;color:var(--muted);font-size:13px;text-align:center}
+  a.link{color:var(--accent);cursor:pointer}
+  /* responsive */
+  @media(max-width:980px){
+    main{grid-template-columns:1fr}
+    .sidebar{order:2}
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h2>DenyTube</h2>
-  <input id="search" type="text" placeholder="Поиск видео...">
+  <div class="logo">DenyTube</div>
+  <div class="search">
+    <input id="searchInput" type="text" placeholder="Поиск видео (Enter) — работает локально; вставь API ключ в Настройки для реального поиска" />
+    <button id="searchBtn">Поиск</button>
+    <button id="randomBtn" class="primary">Случайное</button>
+  </div>
+  <div id="userArea" style="display:flex;gap:8px;align-items:center"></div>
 </header>
 
-<div id="content">
-  <div id="sidebar">
-    <h3>Меню</h3>
-    <p>🔹 Главная</p>
-    <p>🔹 Тренды</p>
-    <p>🔹 Подписки</p>
-    <p>🔹 История</p>
+<main>
+  <section>
+    <div class="player card">
+      <div class="video-wrap" id="playerWrap">
+        <!-- iframe injected here -->
+        <div id="playerStub" class="stub center">Выбери видео или нажми «Случайное»</div>
+      </div>
+
+      <div class="meta">
+        <div>
+          <div class="title" id="videoTitle">—</div>
+          <div class="channel small" id="videoChannel" onclick="goChannel('')">—</div>
+        </div>
+        <div class="actions" id="videoActions">
+          <div id="likeBtn" style="display:inline-flex;gap:6px;align-items:center;cursor:pointer">👍 <span id="likeCount">0</span></div>
+          <div id="dislikeBtn" style="display:inline-flex;gap:6px;align-items:center;cursor:pointer">👎 <span id="dislikeCount">0</span></div>
+          <div id="subscribeBtn" style="display:inline-flex;gap:6px;align-items:center;cursor:pointer">🔔 Подписаться</div>
+        </div>
+      </div>
+
+      <div class="comments card" id="commentsSection">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <div style="font-weight:800">Комментарии</div>
+          <div class="small" id="commentsCount">0</div>
+        </div>
+        <div id="commentForm" style="margin-top:8px;display:none">
+          <textarea id="commentText" placeholder="Оставить комментарий..." style="width:100%;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--white)"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+            <button id="postCommentBtn" class="primary">Отправить</button>
+          </div>
+        </div>
+        <div id="commentsList" style="margin-top:12px"></div>
+        <div id="loginHint" class="small" style="margin-top:8px">Войдите, чтобы оставить комментарий</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:900">Рекомендации</div>
+        <div class="small">Тренды · Рандом</div>
+      </div>
+      <div id="recommendList" class="list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <aside class="sidebar">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:900">Профиль</div>
+        <div class="small"><a class="link" onclick="openSettings()">Настройки</a></div>
+      </div>
+      <div id="profileBox" style="margin-top:10px">
+        <div class="stub">Неавторизован</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:900">Тренды</div>
+        <div class="small"><a class="link" onclick="generateTrending()">Обновить</a></div>
+      </div>
+      <div id="trendingList" class="list" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:900">Канал</div>
+      <div class="small" style="margin-top:8px">Созданные локальные каналы (автор = канал)</div>
+      <div id="channelsList" class="list" style="margin-top:10px"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  DenyTube — локальная демоверсия. Видео встраиваются с YouTube. Настройки: вставь YouTube API ключ, если хочешь реальный поиск.
+</footer>
+
+<!-- SETTINGS / AUTH MODALS (simple client-side) -->
+<div id="modal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:200">
+  <div style="width:980px;max-width:95%;background:#071018;border-radius:12px;padding:18px;color:var(--white);box-shadow:0 20px 60px rgba(0,0,0,0.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:900" id="modalTitle">Модал</div>
+      <div style="cursor:pointer" onclick="closeModal()">✖</div>
+    </div>
+    <div id="modalBody" style="margin-top:12px"></div>
   </div>
-
-  <div id="videos"></div>
-</div>
-
-<div id="player">
-  <div id="closePlayer">✖</div>
-  <iframe id="frame" allowfullscreen></iframe>
 </div>
 
 <script>
-// ========== НАСТРОЙКИ ==========
-const API_KEY = "PASTE_YOUR_API_KEY_HERE"; // <-- ВСТАВЬ СВОЙ API КЛЮЧ
-const API_URL = "https://www.googleapis.com/youtube/v3/search";
+/*
+  DenyTube — single-file static app.
+  Storage structure (localStorage):
+    - dt_videos : array of video objects {id,title,channel,channelId,thumb,desc,createdAt}
+    - dt_comments : array {id, videoId, author, text, createdAt}
+    - dt_users : map username -> {passwordHash, name, avatar, subs:[], likes:{videoId:1/-1}}
+    - dt_session : current username
+    - dt_settings : {apiKey:...}
+  Notes: this is local demo; not secure for real auth.
+*/
 
-// ========== ЗАГРУЗКА СЛУЧАЙНЫХ ВИДЕО ==========
-async function loadRandomVideos() {
-  const query = ["news", "gameplay", "music", "minecraft", "tech", "funny"][Math.floor(Math.random()*6)];
+// ---------- Utilities ----------
+const uid = (n=8)=>Math.random().toString(36).slice(2,2+n);
+const nowISO = ()=>new Date().toISOString();
+const $ = id => document.getElementById(id);
+const loadJSON = k => JSON.parse(localStorage.getItem(k) || 'null');
+const saveJSON = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+const ensure = (k, init) => { if(localStorage.getItem(k)===null) saveJSON(k, init); return loadJSON(k); };
 
-  const url = `${API_URL}?key=${API_KEY}&type=video&part=snippet&maxResults=25&q=${query}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  showVideos(data.items);
+// ---------- Init sample data if empty ----------
+function initSampleData(){
+  if(!localStorage.getItem('dt_videos')){
+    const sample = [
+      { id:'dQw4w9WgXcQ', title:'Rick Astley — Never Gonna Give You Up', channel:'RickAstley', channelId:'rick', thumb:`https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg`, desc:'Classic', createdAt:nowISO() },
+      { id:'M7lc1UVf-VE', title:'YouTube Developers Live', channel:'YouTube', channelId:'youtube', thumb:`https://img.youtube.com/vi/M7lc1UVf-VE/hqdefault.jpg`, desc:'YT API demo', createdAt:nowISO() },
+      { id:'kXYiU_JCYtU', title:'Linkin Park - Numb', channel:'LinkinPark', channelId:'linkin', thumb:`https://img.youtube.com/vi/kXYiU_JCYtU/hqdefault.jpg`, desc:'Music', createdAt:nowISO() },
+      { id:'hY7m5jjJ9mM', title:'Cute Cat Video', channel:'CatChannel', channelId:'cat', thumb:`https://img.youtube.com/vi/hY7m5jjJ9mM/hqdefault.jpg`, desc:'Cats', createdAt:nowISO() },
+      { id:'3JZ_D3ELwOQ', title:'Top 10 Algorithms', channel:'CodeAcademy', channelId:'code', thumb:`https://img.youtube.com/vi/3JZ_D3ELwOQ/hqdefault.jpg`, desc:'Programming', createdAt:nowISO() },
+      { id:'V-_O7nl0Ii0', title:'Keyboard Cat', channel:'Memes', channelId:'memes', thumb:`https://img.youtube.com/vi/V-_O7nl0Ii0/hqdefault.jpg`, desc:'Meme', createdAt:nowISO() }
+    ];
+    saveJSON('dt_videos', sample);
+  }
+  if(!localStorage.getItem('dt_comments')) saveJSON('dt_comments', []);
+  if(!localStorage.getItem('dt_users')){
+    // create demo user
+    const users = { 'demo': { password:'demo', name:'Demo User', avatar:'DU', subs:[], likes:{}, profileDesc:'Локальный тестовый пользователь' } };
+    saveJSON('dt_users', users);
+  }
+  if(!localStorage.getItem('dt_settings')) saveJSON('dt_settings', { apiKey: '' });
+}
+initSampleData();
+
+// ---------- App State ----------
+let VIDEOS = ensure('dt_videos', []);
+let COMMENTS = ensure('dt_comments', []);
+let USERS = ensure('dt_users', {});
+let SETTINGS = ensure('dt_settings', { apiKey:'' });
+
+let SESSION = localStorage.getItem('dt_session') || null;
+renderUserArea();
+renderProfileBox();
+renderRecommendList();
+renderTrending();
+renderChannelsList();
+
+// ---------- Routing helpers ----------
+function openVideoById(id){
+  const v = VIDEOS.find(x=>x.id===id);
+  if(!v) return alert('Видео не найдено локально.');
+  // inject iframe
+  const wrap = $('playerWrap');
+  wrap.innerHTML = `<iframe src="https://www.youtube.com/embed/${v.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  $('videoTitle').textContent = v.title;
+  $('videoChannel').textContent = v.channel;
+  $('videoChannel').onclick = ()=>goChannel(v.channelId);
+  // likes/dislikes
+  const stats = videoStats(v.id);
+  $('likeCount').textContent = stats.likes;
+  $('dislikeCount').textContent = stats.dislikes;
+  // subscribe button text
+  updateSubscribeBtn(v.channelId);
+  // comments
+  renderComments(v.id);
+  // show/hide comment form based on auth
+  if(SESSION) {
+    $('commentForm').style.display = 'block';
+    $('loginHint').style.display = 'none';
+  } else {
+    $('commentForm').style.display = 'none';
+    $('loginHint').style.display = 'block';
+  }
+  // store last opened
+  localStorage.setItem('dt_last_video', v.id);
 }
 
-// ========== ПОИСК ==========
-document.getElementById("search").addEventListener("keyup", async (e) => {
-  if (e.key !== "Enter") return;
-
-  const q = e.target.value;
-  const url = `${API_URL}?key=${API_KEY}&type=video&part=snippet&maxResults=25&q=${q}`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-  showVideos(data.items);
+// ---------- Like/Dislike logic (per user) ----------
+function videoStats(videoId){
+  // count across USERS.likes map
+  let likes=0, dislikes=0;
+  Object.values(USERS).forEach(u=>{
+    const m = u.likes || {};
+    if(m[videoId]===1) likes++;
+    if(m[videoId]===-1) dislikes++;
+  });
+  return {likes,dislikes};
+}
+function toggleLike(videoId, val){
+  if(!SESSION) return showAuthModal();
+  const user = USERS[SESSION];
+  user.likes = user.likes || {};
+  const current = user.likes[videoId] || 0;
+  if(current === val) user.likes[videoId] = 0;
+  else user.likes[videoId] = val;
+  USERS[SESSION] = user; saveJSON('dt_users', USERS);
+  const stats = videoStats(videoId);
+  $('likeCount').textContent = stats.likes;
+  $('dislikeCount').textContent = stats.dislikes;
+  renderProfileBox();
+  renderRecommendList();
+}
+$('likeBtn').addEventListener('click', ()=> {
+  const id = localStorage.getItem('dt_last_video');
+  if(id) toggleLike(id, 1);
+});
+$('dislikeBtn').addEventListener('click', ()=> {
+  const id = localStorage.getItem('dt_last_video');
+  if(id) toggleLike(id, -1);
 });
 
-// ========== ПОКАЗ ВИДЕО ==========
-function showVideos(items) {
-  const container = document.getElementById("videos");
-  container.innerHTML = "";
+// ---------- Subscribe (local) ----------
+function updateSubscribeBtn(channelId){
+  if(!$('subscribeBtn')) return;
+  if(!SESSION){ $('subscribeBtn').textContent = '🔔 Подписаться'; return; }
+  const user = USERS[SESSION];
+  user.subs = user.subs || [];
+  const subbed = user.subs.includes(channelId);
+  $('subscribeBtn').textContent = subbed ? '✔ Подписан' : '🔔 Подписаться';
+}
+$('subscribeBtn').addEventListener('click', ()=>{
+  const id = localStorage.getItem('dt_last_video');
+  if(!id) return;
+  const v = VIDEOS.find(x=>x.id===id);
+  if(!v) return;
+  if(!SESSION) return showAuthModal();
+  const user = USERS[SESSION];
+  user.subs = user.subs || [];
+  const idx = user.subs.indexOf(v.channelId);
+  if(idx===-1) user.subs.push(v.channelId); else user.subs.splice(idx,1);
+  USERS[SESSION]=user; saveJSON('dt_users',USERS);
+  updateSubscribeBtn(v.channelId);
+  renderProfileBox();
+});
 
-  items.forEach(v => {
-    const id = v.id.videoId;
-    const thumb = v.snippet.thumbnails.high.url;
-    const title = v.snippet.title;
+// ---------- Comments ----------
+function renderComments(videoId){
+  const list = COMMENTS.filter(c=>c.videoId===videoId).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  $('commentsList').innerHTML = list.map(c=>`
+    <div class="comment">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="avatar" style="width:36px;height:36px;font-size:13px">${escapeHTML(getInitials(c.author))}</div>
+        <div>
+          <div style="font-weight:700">${escapeHTML(c.author)}</div>
+          <div class="small">${new Date(c.createdAt).toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px">${escapeHTML(c.text)}</div>
+    </div>
+  `).join('');
+  $('commentsCount').textContent = list.length;
+}
+function postComment(){
+  if(!SESSION) return showAuthModal();
+  const text = $('commentText').value.trim();
+  if(!text) return;
+  const vid = localStorage.getItem('dt_last_video');
+  if(!vid) return;
+  const c = { id: uid(6), videoId: vid, author: SESSION, text, createdAt: nowISO() };
+  COMMENTS.push(c); saveJSON('dt_comments', COMMENTS);
+  $('commentText').value = '';
+  renderComments(vid);
+}
+$('postCommentBtn').addEventListener('click', postComment);
 
-    const div = document.createElement("div");
-    div.className = "video";
-    div.innerHTML = `
-      <img src="${thumb}">
-      <div class="video-title">${title}</div>
-    `;
-    div.onclick = () => openVideo(id);
-
-    container.appendChild(div);
+// ---------- Search / Recommendations / Trending ----------
+function renderRecommendList(){
+  // simple: random subset weighted by likes
+  const sample = [...VIDEOS];
+  sample.sort((a,b)=>{
+    const sa = videoStats(a.id).likes;
+    const sb = videoStats(b.id).likes;
+    return sb - sa || (Math.random()-0.5);
+  });
+  const top = sample.slice(0,10);
+  const container = $('recommendList'); container.innerHTML = '';
+  top.forEach(v=>{
+    const el = document.createElement('div'); el.className='list-item';
+    el.innerHTML = `<img class="thumb" src="${v.thumb}"><div style="flex:1"><div class="vtitle">${v.title}</div><div class="small">${v.channel}</div></div>`;
+    el.onclick = ()=>openVideoById(v.id);
+    container.appendChild(el);
+  });
+}
+function generateTrending(){
+  // trending = random shuffle then sort by likes
+  const arr = [...VIDEOS];
+  arr.sort(()=>Math.random()-0.5);
+  arr.sort((a,b)=>videoStats(b.id).likes - videoStats(a.id).likes);
+  const container = $('trendingList'); container.innerHTML='';
+  arr.slice(0,8).forEach(v=>{
+    const el = document.createElement('div'); el.className='list-item';
+    el.innerHTML = `<img class="thumb" src="${v.thumb}"><div style="flex:1"><div class="vtitle">${v.title}</div><div class="small">${v.channel}</div></div>`;
+    el.onclick = ()=>openVideoById(v.id);
+    container.appendChild(el);
+  });
+}
+function renderChannelsList(){
+  // gather unique channels
+  const channels = {};
+  VIDEOS.forEach(v=>{ channels[v.channelId] = {id:v.channelId, title:v.channel, count:(channels[v.channelId]?.count||0)+1} });
+  const container = $('channelsList'); container.innerHTML='';
+  Object.values(channels).forEach(ch=>{
+    const el = document.createElement('div'); el.className='list-item';
+    el.innerHTML = `<div style="flex:1"><div class="vtitle">${ch.title}</div><div class="small">${ch.count} видео</div></div>`;
+    el.onclick = ()=>goChannel(ch.id);
+    container.appendChild(el);
   });
 }
 
-// ========== ОТКРЫТИЕ ВИДЕО ==========
-function openVideo(id) {
-  document.getElementById("player").style.display = "flex";
-  document.getElementById("frame").src = `https://www.youtube.com/embed/${id}`;
+// ---------- Channels, Profiles ----------
+function goChannel(channelId){
+  // show modal with channel videos
+  const chVideos = VIDEOS.filter(v=>v.channelId===channelId);
+  showModal(`Канал — ${channelId}`, `
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto">
+      ${chVideos.map(v=>`<div style="display:flex;gap:8px;align-items:center;cursor:pointer;padding:8px;border-radius:8px" onclick="openVideoFromModal('${v.id}')">
+        <img style="width:160px;height:90px;object-fit:cover;border-radius:6px" src="${v.thumb}">
+        <div><div style="font-weight:700">${escapeHTML(v.title)}</div><div class="small">${escapeHTML(v.channel)}</div></div>
+      </div>`).join('')}
+    </div>
+  `);
+}
+function openVideoFromModal(id){ closeModal(); openVideoById(id); }
+
+function renderProfileBox(){
+  const container = $('profileBox');
+  if(!SESSION){ container.innerHTML = `<div class="stub">Неавторизован. <a class="link" onclick="showAuthModal()">Войти / Регистрация</a></div>`; return; }
+  const user = USERS[SESSION];
+  const html = `
+    <div class="profile">
+      <div class="avatar">${escapeHTML(getInitials(user.name || SESSION))}</div>
+      <div>
+        <div style="font-weight:800">${escapeHTML(user.name || SESSION)}</div>
+        <div class="small">${escapeHTML(user.profileDesc||'')} </div>
+        <div style="margin-top:8px" class="small">Подписок: ${ (user.subs||[]).length } · Лайков: ${countUserLikes(SESSION)}</div>
+        <div style="margin-top:8px"><button onclick="showProfile('${SESSION}')">Открыть профиль</button></div>
+      </div>
+    </div>
+  `;
+  container.innerHTML = html;
+}
+function showProfile(username){
+  const u = USERS[username];
+  if(!u) return alert('Профиль не найден');
+  showModal(`Профиль — ${escapeHTML(username)}`, `
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="avatar" style="width:72px;height:72px;font-size:22px">${escapeHTML(getInitials(u.name||username))}</div>
+      <div>
+        <div style="font-weight:900">${escapeHTML(u.name||username)}</div>
+        <div class="small">${escapeHTML(u.profileDesc||'')}</div>
+        <div style="margin-top:8px" class="small">Подписок: ${(u.subs||[]).length} · Лайков: ${countUserLikes(username)}</div>
+      </div>
+    </div>
+    <hr style="margin:12px 0">
+    <div><b>Подписки</b></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${(u.subs||[]).map(s=>`<div class="stub" style="padding:6px 10px;cursor:pointer" onclick="goChannel('${s}')">${escapeHTML(s)}</div>`).join('')}</div>
+    <hr style="margin:12px 0">
+    <div><b>Комментарии (последние)</b></div>
+    <div style="margin-top:8px;max-height:220px;overflow:auto">
+      ${COMMENTS.filter(c=>c.author===username).map(c=>`<div class="comment"><div style="font-weight:700">${escapeHTML(c.text)}</div><div class="small">${new Date(c.createdAt).toLocaleString()}</div></div>`).join('')}
+    </div>
+  `);
 }
 
-document.getElementById("closePlayer").onclick = () => {
-  document.getElementById("player").style.display = "none";
-  document.getElementById("frame").src = "";
-};
+// ---------- Auth (client-side) ----------
+function showAuthModal(){
+  showModal('Вход / Регистрация', `
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="authUser" placeholder="Имя пользователя" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--white)">
+      <input id="authName" placeholder="Отображаемое имя (опционально)" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--white)">
+      <input id="authPass" placeholder="Пароль" type="password" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--white)">
+      <button class="primary" onclick="authRegister()">Регистрация</button>
+      <button onclick="authLogin()">Войти</button>
+    </div>
+    <div class="small" style="margin-top:8px">Это локальная авторизация: данные хранятся в твоём браузере (localStorage).</div>
+  `);
+}
+function authRegister(){
+  const user = $('authUser').value.trim();
+  const pass = $('authPass').value;
+  const name = $('authName').value.trim() || user;
+  if(!user || !pass) return alert('Введите логин и пароль');
+  if(USERS[user]) return alert('Пользователь уже существует');
+  USERS[user] = { password: pass, name, avatar: getInitials(name), subs: [], likes: {}, profileDesc:'' };
+  saveJSON('dt_users', USERS);
+  localStorage.setItem('dt_session', user);
+  SESSION = user;
+  closeModal();
+  renderUserArea();
+  renderProfileBox();
+  alert('Зарегистрированы и вошли как ' + user);
+}
+function authLogin(){
+  const user = $('authUser').value.trim();
+  const pass = $('authPass').value;
+  if(!user || !pass) return alert('Введите логин и пароль');
+  if(!USERS[user] || USERS[user].password !== pass) return alert('Неверный логин или пароль');
+  localStorage.setItem('dt_session', user);
+  SESSION = user;
+  closeModal();
+  renderUserArea();
+  renderProfileBox();
+  alert('Вошли как ' + user);
+}
+function logout(){
+  localStorage.removeItem('dt_session');
+  SESSION = null;
+  renderUserArea();
+  renderProfileBox();
+}
+function renderUserArea(){
+  const area = $('userArea'); area.innerHTML = '';
+  if(SESSION){
+    const u = USERS[SESSION];
+    area.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><div class="small">${escapeHTML(u.name||SESSION)}</div><button onclick="showProfile('${SESSION}')">Профиль</button><button onclick="logout()">Выйти</button></div>`;
+  } else {
+    area.innerHTML = `<div style="display:flex;gap:8px"><button onclick="showAuthModal()">Войти</button><button onclick="showAuthModal()">Регистрация</button></div>`;
+  }
+}
 
-// ========== СТАРТ ==========
-loadRandomVideos();
+// ---------- Settings (API key) ----------
+function openSettings(){
+  showModal('Настройки', `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="small">Если хочешь реальный поиск по YouTube, вставь сюда свой YouTube Data API v3 ключ. Без ключа работает локальный набор видео.</div>
+      <input id="apiKeyInput" placeholder="API KEY (опционально)" style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--white)" value="${escapeHTML(SETTINGS.apiKey||'')}">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="primary" onclick="saveSettings()">Сохранить</button>
+      </div>
+    </div>
+  `);
+}
+function saveSettings(){
+  const k = $('apiKeyInput').value.trim();
+  SETTINGS.apiKey = k;
+  saveJSON('dt_settings', SETTINGS);
+  SETTINGS = ensure('dt_settings', {});
+  closeModal();
+  alert('Сохранено');
+}
+
+// ---------- Modal helpers ----------
+function showModal(title, html){
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = html;
+  $('modal').style.display = 'flex';
+}
+function closeModal(){ $('modal').style.display = 'none'; $('modalBody').innerHTML = ''; }
+
+// ---------- Small helpers ----------
+function escapeHTML(s=''){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function getInitials(str=''){ return String(str||'U').split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase(); }
+function countUserLikes(username){ const u = USERS[username]; if(!u) return 0; return Object.values(u.likes||{}).filter(x=>x===1).length; }
+
+// ---------- Simple Search (local or via API if key present) ----------
+async function performSearch(q){
+  q = (q||'').trim();
+  if(!q) return;
+  if(SETTINGS.apiKey){
+    // try YouTube Data API (client-side request) - NOTE: exposing key publicly in GitHub is your risk
+    try{
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/search?key=${encodeURIComponent(SETTINGS.apiKey)}&q=${encodeURIComponent(q)}&part=snippet&type=video&maxResults=24`);
+      const json = await res.json();
+      if(json.items){
+        // convert to local video objects (but do not save to storage)
+        const items = json.items.map(i=>({
+          id: i.id.videoId,
+          title: i.snippet.title,
+          channel: i.snippet.channelTitle,
+          channelId: i.snippet.channelId,
+          thumb: i.snippet.thumbnails?.high?.url || i.snippet.thumbnails?.default?.url,
+          desc: i.snippet.description
+        }));
+        showSearchResults(items);
+        return;
+      }
+    }catch(e){
+      console.warn('API search failed', e);
+      alert('Поиск по API не удался, используется локальный поиск.');
+    }
+  }
+  // local search fallback
+  const qlow = q.toLowerCase();
+  const items = VIDEOS.filter(v=> (v.title+v.channel+v.desc).toLowerCase().includes(qlow));
+  showSearchResults(items);
+}
+function showSearchResults(items){
+  // reuse recommendList area for results
+  const container = $('recommendList'); container.innerHTML = '';
+  if(items.length===0){ container.innerHTML = '<div class="stub">Ничего не найдено</div>'; return; }
+  items.forEach(v=>{
+    const el = document.createElement('div'); el.className='list-item';
+    el.innerHTML = `<img class="thumb" src="${v.thumb}"><div style="flex:1"><div class="vtitle">${v.title}</div><div class="small">${v.channel}</div></div>`;
+    el.onclick = ()=>openVideoById(v.id);
+    container.appendChild(el);
+  });
+  // scroll to player
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+// ---------- Helpers to add videos locally ----------
+function addLocalVideo(obj){
+  // obj: {id,title,channel,channelId,thumb,desc}
+  if(!obj || !obj.id) return;
+  if(VIDEOS.some(v=>v.id===obj.id)) return;
+  VIDEOS.push(obj);
+  saveJSON('dt_videos', VIDEOS);
+  renderChannelsList();
+  renderRecommendList();
+  generateTrending();
+}
+
+// ---------- Trending generator / auto update simulation ----------
+function simulateAutoUpdate(){
+  // every time called, randomly add a "new" video occasionally
+  if(Math.random() < 0.12){
+    const id = uid(10);
+    const v = { id, title: `Новое видео ${id.slice(0,6)}`, channel:`User${id.slice(0,4)}`, channelId:`ch_${id.slice(0,6)}`, thumb:`https://picsum.photos/seed/${id}/320/180`, desc:'Автосгенерированное', createdAt: nowISO() };
+    addLocalVideo(v);
+    console.log('Added auto video', v.id);
+  }
+}
+setInterval(()=>{
+  simulateAutoUpdate();
+  renderRecommendList();
+  generateTrending();
+}, 60*1000); // every minute (simulates автозагрузка новых видео)
+
+// ---------- Small utilities for modal actions from strings ----------
+window.openVideoFromModal = openVideoFromModal;
+
+// ---------- Events ----------
+$('searchBtn').addEventListener('click', ()=>performSearch($('searchInput').value));
+$('searchInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') performSearch(e.target.value); });
+$('randomBtn').addEventListener('click', ()=> {
+  // pick a random video from VIDEOS
+  const id = VIDEOS[Math.floor(Math.random()*VIDEOS.length)].id;
+  openVideoById(id);
+});
+
+// ---------- Escape hatch: load last opened video if exists ----------
+const last = localStorage.getItem('dt_last_video');
+if(last) setTimeout(()=>openVideoById(last), 400);
+
+// ---------- helper escape for names shown in HTML attributes -->
+function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
 
 </script>
 </body>
